@@ -1,0 +1,275 @@
+---
+title: "Cyclistic Analysis"
+output: html_document
+date: "2023-09-06"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Libraries
+```{r cars}
+library(tidyverse) #data wrangling
+library(lubridate) #for date
+library(ggplot2) #data viz
+```
+
+## Read CSV files
+```{r pressure, echo=FALSE}
+
+data0423 <- read.csv("202304-divvy-tripdata.csv")
+data0423["month"] <- "April"
+
+data0323 <- read.csv("202303-divvy-tripdata.csv")
+data0323["month"] <- "March"
+
+data0223 <- read.csv("202302-divvy-tripdata.csv")
+data0223["month"] <- "February"
+
+data0123 <- read.csv("202301-divvy-tripdata.csv")
+data0123["month"] <- "January"
+
+data1222 <- read.csv("202212-divvy-tripdata.csv")
+data1222["month"] <- "December"
+
+data1122 <- read.csv("202211-divvy-tripdata.csv")
+data1122["month"] <- "November"
+
+data1022 <- read.csv("202210-divvy-tripdata.csv")
+data1022["month"] <- "October"
+
+data0922 <- read.csv("202209-divvy-publictripdata.csv")
+data0922["month"] <- "September"
+
+data0822 <- read.csv("202208-divvy-tripdata.csv")
+data0822["month"] <- "August"
+
+data0722 <- read.csv("202207-divvy-tripdata.csv")
+data0722["month"] <- "July"
+
+data0622 <- read.csv("202206-divvy-tripdata.csv")
+data0622["month"] <- "June"
+
+data0522 <- read.csv("202205-divvy-tripdata.csv")
+data0522["month"] <- "May"
+
+```
+
+## Check data structure
+```{r}
+# str(data0423)
+# str(data0323)
+# str(data0223)
+# str(data0123)
+# str(data1222)
+# str(data1122)
+# str(data1022)
+# str(data0922)
+# str(data0822)
+# str(data0722)
+# str(data0622)
+
+```
+
+
+##Combine dataset
+```{r}
+full_year_2223data <- rbind(data0423,data0323,data0223,data0123
+                            ,data1222,data1122
+                            ,data1022,data0922,data0822,data0722,
+                            data0622,data0522)
+```
+
+##Take a peek of the dataset
+```{r}
+head(full_year_2223data)
+str(full_year_2223data)
+```
+
+##Change started_at & ended_at to POSIXct objects
+```{r}
+full_year_2223data$started_at <- ymd_hms(full_year_2223data$started_at)
+full_year_2223data$ended_at <- ymd_hms(full_year_2223data$ended_at)
+```
+
+###Extract the time & date components 
+```{r}
+full_year_2223data$time_start <- 
+  format(full_year_2223data$started_at, format = "%H:%M:%S")
+full_year_2223data$date_start <- 
+  format(full_year_2223data$started_at, format = "%Y-%m-%d")
+full_year_2223data$time_end <- 
+  format(full_year_2223data$ended_at, format = "%H:%M:%S")
+full_year_2223data$date_end <- 
+  format(full_year_2223data$ended_at, format = "%Y-%m-%d")
+```
+
+
+##Convert time_start & time_end to POSIXct objects
+```{r}
+full_year_2223data$time_start <-
+  as.POSIXct(full_year_2223data$time_start, format = "%H:%M:%S")
+full_year_2223data$time_end <- 
+  as.POSIXct(full_year_2223data$time_end, format = "%H:%M:%S")
+
+class(full_year_2223data$time_start)
+class(full_year_2223data$time_end)
+```
+
+
+##Obtain ride length 
+```{r}
+full_year_2223data$ride_length <- 
+  difftime(full_year_2223data$time_end,full_year_2223data$time_start)%>%
+  as.numeric( units = "mins")%>%
+  round(digits=2)
+```
+
+
+##Create a Date object 
+```{r}
+full_year_2223data$date_start <- as.Date(full_year_2223data$date_start)
+full_year_2223data$date_end <- as.Date(full_year_2223data$date_end)
+
+class(full_year_2223data$date_start)
+class(full_year_2223data$date_end)
+```
+
+##Obtain day of the week
+```{r}
+full_year_2223data$day_of_week <- weekdays(full_year_2223data$date_start)
+```
+
+#Remove any duplicates
+```{r}
+full_year_2223data$ride_id <- unique(full_year_2223data$ride_id)
+```
+
+
+
+#Descriptive statistics
+```{r}
+#average ride_length based on the group type 
+aggregate(full_year_2223data$ride_length ~ 
+            full_year_2223data$member_casual, FUN = mean)
+
+#max ride_length based on the group type 
+aggregate(full_year_2223data$ride_length ~ 
+            full_year_2223data$member_casual, FUN = max)
+
+#avg ride length based on the months
+full_year_2223data$month_order <- factor(full_year_2223data$month, 
+                                         levels = month.name)
+aggregate(full_year_2223data$ride_length ~ 
+            full_year_2223data$month_order, FUN = mean)
+
+#avg ride length based on the day of the week
+day_order <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+day_factor <- factor(full_year_2223data$day_of_week, levels = day_order)
+result <- aggregate(full_year_2223data$ride_length ~ day_factor, FUN = mean)
+print(result)
+```
+
+
+#Total Number of Rides by Day & Month
+```{r}
+#Total Number of Rides by Day (grouped by member/casual)
+full_year_2223data %>%
+  group_by(member_casual, day_of_week) %>%
+  summarise(num_rides = n()) %>%
+  arrange(member_casual, day_of_week) %>%
+  mutate(day_of_week = factor(day_of_week, levels = c("Sunday", "Monday", "Tuesday", 
+                                                     "Wednesday", "Thursday", "Friday", "Saturday"))) %>%
+  ggplot(aes(x = day_of_week, y = num_rides, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE)) +
+  xlab('Days of the Week') +
+  ylab('Total Number of Rides') +
+  ggtitle('Total Number of Rides by Day') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+
+
+full_year_2223data %>%
+  group_by(member_casual, month) %>%
+  summarise(num_rides = n()) %>%
+  arrange(member_casual, month) %>%
+  mutate(month = factor(month, levels = month.name)) %>%
+  ggplot(aes(x = month, y = num_rides, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE)) +
+  xlab('Month') +
+  ylab('Total Number of Rides') +
+  ggtitle('Total Number of Rides by Month') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels by 45 degrees
+
+
+```
+
+#Day Statisitcs (Casual vs Member)
+```{r}
+#Total Number of Casual Rides by Day (group by rideable_type)
+full_year_2223data %>%
+  filter(member_casual == "casual") %>%
+  group_by(rideable_type, day_of_week) %>%
+  summarise(num_rides = n()) %>%
+  arrange(rideable_type, day_of_week) %>%
+  mutate(day_of_week = factor(day_of_week, levels = c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))) %>%
+  ggplot(aes(x = day_of_week, y = num_rides, fill = rideable_type)) +
+  geom_col(position = "dodge") +
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE)) +
+  xlab('Days of the Week') +
+  ylab('Total Number of Rides') +
+  ggtitle('Total Number of Casual Rides by Day') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels by 45 degrees
+
+#Total Number of Member Rides by Day (group by rideable_type)
+full_year_2223data%>%
+  filter(member_casual == "member")%>%
+  group_by(rideable_type,day_of_week)%>%
+  summarise(num_rides=n())%>%
+  arrange(rideable_type,day_of_week)%>%
+  mutate(day_of_week = factor(day_of_week, levels = c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))) %>%
+  ggplot(aes(x=day_of_week,y=num_rides,fill=rideable_type))+geom_col(position="dodge")+
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE))+
+  xlab('Days of the Week')+
+  ylab('Total Number of Rides')+
+  ggtitle('Total Number of Member Rides by Day')+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels by 45 degrees
+
+```
+
+#Month Statisitcs (Casual vs Member)
+```{r}
+
+#Total Number of Casual Rides by Month (group by rideable_type)
+full_year_2223data%>%
+  filter(member_casual == "casual")%>%
+  group_by(rideable_type,month)%>%
+  summarise(num_rides=n())%>%
+  arrange(rideable_type,month)%>%
+  mutate(month = factor(month, levels =month.name)) %>%
+  ggplot(aes(x=month,y=num_rides,fill=rideable_type))+geom_col(position="dodge")+
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE))+
+  xlab('Month')+
+  ylab('Total Number of Rides')+
+  ggtitle('Total Number of Casual Rides by Month ')+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels by 45 degrees
+
+#Total Number of Member Rides by Month (group by rideable_type)
+full_year_2223data%>%
+  filter(member_casual == "member")%>%
+  group_by(rideable_type,month)%>%
+  summarise(num_rides=n())%>%
+  arrange(rideable_type,month)%>%
+  mutate(month = factor(month, levels =month.name)) %>%
+  ggplot(aes(x=month,y=num_rides,fill=rideable_type))+geom_col(position="dodge")+
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE))+
+  xlab('Month')+
+  ylab('Total Number of Rides')+
+  ggtitle('Total Number of Member Rides by Month ')+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels by 45 degrees
+
+
+
